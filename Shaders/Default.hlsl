@@ -68,7 +68,7 @@ cbuffer cbMaterial : register(b2)
     float3   gFresnelR0;
     float    gRoughness;
     float4x4 gMatTransform;
-    bool doubleTexture;
+    float gDoubleTexture;
 };
 
 struct VertexIn
@@ -110,12 +110,16 @@ VertexOut VS(VertexIn vin)
 float4 PS(VertexOut pin) : SV_Target
 {
     float4 diffuseAlbedo;
-if (doubleTexture == false) {
-   diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
-    }
-else {
-     diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseMap1.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
+if (gDoubleTexture == 1) {
+ diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
 }
+else {
+diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseMap1.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
+}
+ 
+        
+     
+
 
 
 
