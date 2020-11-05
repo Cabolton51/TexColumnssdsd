@@ -1,24 +1,25 @@
-//***************************************************************************************
+////***************************************************************************************
 // Default.hlsl by Frank Luna (C) 2015 All Rights Reserved.
 //***************************************************************************************
 
 // Defaults for number of lights.
 #ifndef NUM_DIR_LIGHTS
-    #define NUM_DIR_LIGHTS 3
+#define NUM_DIR_LIGHTS 3
 #endif
 
 #ifndef NUM_POINT_LIGHTS
-    #define NUM_POINT_LIGHTS 0
+#define NUM_POINT_LIGHTS 0
 #endif
 
 #ifndef NUM_SPOT_LIGHTS
-    #define NUM_SPOT_LIGHTS 0
+#define NUM_SPOT_LIGHTS 0
 #endif
 
 // Include structures and functions for lighting.
 #include "LightingUtil.hlsl"
 
 Texture2D    gDiffuseMap : register(t0);
+Texture2D    gDiffuseMap1 : register(t1);
 
 
 SamplerState gsamPointWrap        : register(s0);
@@ -32,7 +33,7 @@ SamplerState gsamAnisotropicClamp : register(s5);
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
-	float4x4 gTexTransform;
+    float4x4 gTexTransform;
 };
 
 // Constant data that varies per material.
@@ -63,31 +64,32 @@ cbuffer cbPass : register(b1)
 
 cbuffer cbMaterial : register(b2)
 {
-	float4   gDiffuseAlbedo;
+    float4   gDiffuseAlbedo;
     float3   gFresnelR0;
     float    gRoughness;
-	float4x4 gMatTransform;
+    float4x4 gMatTransform;
+    bool doubleTexture;
 };
 
 struct VertexIn
 {
-	float3 PosL    : POSITION;
+    float3 PosL    : POSITION;
     float3 NormalL : NORMAL;
-	float2 TexC    : TEXCOORD;
+    float2 TexC    : TEXCOORD;
 };
 
 struct VertexOut
 {
-	float4 PosH    : SV_POSITION;
+    float4 PosH    : SV_POSITION;
     float3 PosW    : POSITION;
     float3 NormalW : NORMAL;
-	float2 TexC    : TEXCOORD;
+    float2 TexC    : TEXCOORD;
 };
 
 VertexOut VS(VertexIn vin)
 {
-	VertexOut vout = (VertexOut)0.0f;
-	
+    VertexOut vout = (VertexOut)0.0f;
+
     // Transform to world space.
     float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
     vout.PosW = posW.xyz;
@@ -97,39 +99,52 @@ VertexOut VS(VertexIn vin)
 
     // Transform to homogeneous clip space.
     vout.PosH = mul(posW, gViewProj);
-	
-	// Output vertex attributes for interpolation across triangle.
-	float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
-	vout.TexC = mul(texC, gMatTransform).xy;
-	
+
+    // Output vertex attributes for interpolation across triangle.
+    float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
+    vout.TexC = mul(texC, gMatTransform).xy;
+
     return vout;
 }
 
 float4 PS(VertexOut pin) : SV_Target
 {
-    float4 diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
-	
-    // Interpolating normal can unnormalize it, so renormalize it.
-    pin.NormalW = normalize(pin.NormalW);
+    float4 diffuseAlbedo;
+if (doubleTexture == false) {
+   diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
+    }
+else {
+     diffuseAlbedo = gDiffuseMap.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseMap1.Sample(gsamAnisotropicWrap, pin.TexC) * gDiffuseAlbedo;
+}
 
-    // Vector from point being lit to eye. 
-    float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
-    // Light terms.
-    float4 ambient = gAmbientLight*diffuseAlbedo;
 
-    const float shininess = 1.0f - gRoughness;
-    Material mat = { diffuseAlbedo, gFresnelR0, shininess };
-    float3 shadowFactor = 1.0f;
-    float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
-        pin.NormalW, toEyeW, shadowFactor);
 
-    float4 litColor = ambient + directLight;
 
-    // Common convention to take alpha from diffuse albedo.
-    litColor.a = diffuseAlbedo.a;
 
-    return litColor;
+
+
+// Interpolating normal can unnormalize it, so renormalize it.
+pin.NormalW = normalize(pin.NormalW);
+
+// Vector from point being lit to eye. 
+float3 toEyeW = normalize(gEyePosW - pin.PosW);
+
+// Light terms.
+float4 ambient = gAmbientLight * diffuseAlbedo;
+
+const float shininess = 1.0f - gRoughness;
+Material mat = { diffuseAlbedo, gFresnelR0, shininess };
+float3 shadowFactor = 1.0f;
+float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
+    pin.NormalW, toEyeW, shadowFactor);
+
+float4 litColor = ambient + directLight;
+
+// Common convention to take alpha from diffuse albedo.
+litColor.a = diffuseAlbedo.a;
+
+return litColor;
 }
 
 
